@@ -47,6 +47,27 @@ public class CatalogEventPublisher {
         log.debug("Published {}: copyId={}, titleId={}", RabbitMQConfig.ROUTING_KEY_COPY_REGISTERED, copyId, titleId);
     }
 
+    public void publishCopyReserved(UUID loanId, UUID copyId, UUID titleId) {
+        var payload = new CopyReservedPayload(loanId, copyId, titleId);
+        var envelope = MessageEnvelope.of(RabbitMQConfig.ROUTING_KEY_COPY_RESERVED, payload);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.ROUTING_KEY_COPY_RESERVED, envelope);
+        log.debug("Published {}: loanId={}, copyId={}", RabbitMQConfig.ROUTING_KEY_COPY_RESERVED, loanId, copyId);
+    }
+
+    public void publishCopyReservationFailed(UUID loanId, UUID titleId, String reason) {
+        var payload = new CopyReservationFailedPayload(loanId, titleId, reason);
+        var envelope = MessageEnvelope.of(RabbitMQConfig.ROUTING_KEY_COPY_RESERVATION_FAILED, payload);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.ROUTING_KEY_COPY_RESERVATION_FAILED, envelope);
+        log.debug("Published {}: loanId={}, titleId={}", RabbitMQConfig.ROUTING_KEY_COPY_RESERVATION_FAILED, loanId, titleId);
+    }
+
+    public void publishCopyReleased(UUID loanId, UUID copyId, UUID titleId) {
+        var payload = new CopyReleasedPayload(loanId, copyId, titleId);
+        var envelope = MessageEnvelope.of(RabbitMQConfig.ROUTING_KEY_COPY_RELEASED, payload);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, RabbitMQConfig.ROUTING_KEY_COPY_RELEASED, envelope);
+        log.debug("Published {}: loanId={}, copyId={}", RabbitMQConfig.ROUTING_KEY_COPY_RELEASED, loanId, copyId);
+    }
+
     // --- Event payload records ---
 
     record TitleCreatedPayload(UUID titleId, String isbn, String title, String author, String genre) {}
@@ -56,4 +77,10 @@ public class CatalogEventPublisher {
     record TitleDeletedPayload(UUID titleId) {}
 
     record CopyRegisteredPayload(UUID copyId, UUID titleId, CopyCondition condition) {}
+
+    record CopyReservedPayload(UUID loanId, UUID copyId, UUID titleId) {}
+
+    record CopyReservationFailedPayload(UUID loanId, UUID titleId, String reason) {}
+
+    record CopyReleasedPayload(UUID loanId, UUID copyId, UUID titleId) {}
 }
