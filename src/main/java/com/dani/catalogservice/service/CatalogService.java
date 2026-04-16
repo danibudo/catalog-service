@@ -5,6 +5,7 @@ import com.dani.catalogservice.exception.InsufficientPermissionsException;
 import com.dani.catalogservice.exception.InvalidOperationException;
 import com.dani.catalogservice.exception.IsbnAlreadyExistsException;
 import com.dani.catalogservice.exception.TitleNotFoundException;
+import com.dani.catalogservice.messaging.CatalogEventPublisher;
 import com.dani.catalogservice.model.Copy;
 import com.dani.catalogservice.model.CopyCondition;
 import com.dani.catalogservice.model.CopyStatus;
@@ -29,10 +30,13 @@ public class CatalogService {
 
     private final TitleRepository titleRepository;
     private final CopyRepository copyRepository;
+    private final CatalogEventPublisher eventPublisher;
 
-    public CatalogService(TitleRepository titleRepository, CopyRepository copyRepository) {
+    public CatalogService(TitleRepository titleRepository, CopyRepository copyRepository,
+                          CatalogEventPublisher eventPublisher) {
         this.titleRepository = titleRepository;
         this.copyRepository = copyRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     // -------------------------------------------------------------------------
@@ -78,8 +82,10 @@ public class CatalogService {
         entity.setDescription(description);
 
         titleRepository.saveAndFlush(entity);
-        log.info("Title created: id={}, isbn={}", entity.getId(), isbn);
-        return titleRepository.findById(entity.getId()).orElseThrow();
+        Title saved = titleRepository.findById(entity.getId()).orElseThrow();
+        log.info("Title created: id={}, isbn={}", saved.getId(), isbn);
+        eventPublisher.publishTitleCreated(saved.getId(), saved.getIsbn(), saved.getTitle(), saved.getAuthor(), saved.getGenre());
+        return saved;
     }
 
     @Transactional
@@ -97,8 +103,10 @@ public class CatalogService {
         if (description != null)     entity.setDescription(description);
 
         titleRepository.saveAndFlush(entity);
+        Title saved = titleRepository.findById(id).orElseThrow();
         log.info("Title updated: id={}", id);
-        return titleRepository.findById(id).orElseThrow();
+        eventPublisher.publishTitleUpdated(id);
+        return saved;
     }
 
     @Transactional
@@ -119,6 +127,7 @@ public class CatalogService {
 
         titleRepository.delete(entity);
         log.info("Title deleted: id={}", id);
+        eventPublisher.publishTitleDeleted(id);
     }
 
     // -------------------------------------------------------------------------
@@ -151,8 +160,10 @@ public class CatalogService {
         copy.setCondition(condition);
 
         copyRepository.saveAndFlush(copy);
-        log.info("Copy created: id={}, titleId={}", copy.getId(), titleId);
-        return copyRepository.findById(copy.getId()).orElseThrow();
+        Copy saved = copyRepository.findById(copy.getId()).orElseThrow();
+        log.info("Copy created: id={}, titleId={}", saved.getId(), titleId);
+        eventPublisher.publishCopyRegistered(saved.getId(), saved.getTitleId(), saved.getCondition());
+        return saved;
     }
 
     @Transactional
