@@ -40,7 +40,7 @@ public class CatalogService {
     }
 
     // -------------------------------------------------------------------------
-    // Title — reads
+    // Title - reads
     // -------------------------------------------------------------------------
 
     public List<Title> getTitles(String author, String genre, Boolean available) {
@@ -61,7 +61,7 @@ public class CatalogService {
     }
 
     // -------------------------------------------------------------------------
-    // Title — writes
+    // Title - writes
     // -------------------------------------------------------------------------
 
     @Transactional
@@ -131,7 +131,7 @@ public class CatalogService {
     }
 
     // -------------------------------------------------------------------------
-    // Copy — reads
+    // Copy - reads
     // -------------------------------------------------------------------------
 
     public List<Copy> getCopiesForTitle(UUID titleId, CallerContext caller) {
@@ -144,7 +144,7 @@ public class CatalogService {
     }
 
     // -------------------------------------------------------------------------
-    // Copy — writes
+    // Copy - writes
     // -------------------------------------------------------------------------
 
     @Transactional
@@ -194,6 +194,38 @@ public class CatalogService {
 
         copyRepository.delete(copy);
         log.info("Copy decommissioned: id={}", id);
+    }
+
+    // -------------------------------------------------------------------------
+    // Saga - copy reservation & release
+    // -------------------------------------------------------------------------
+
+    @Transactional
+    public void reserveCopy(UUID loanId, UUID titleId) {
+        copyRepository.findFirstByTitleIdAndStatus(titleId, CopyStatus.AVAILABLE)
+                .ifPresentOrElse(
+                        copy -> {
+                            copy.setStatus(CopyStatus.ON_LOAN);
+                            copyRepository.saveAndFlush(copy);
+                            log.info("Copy reserved: copyId={}, titleId={}, loanId={}", copy.getId(), titleId, loanId);
+                            eventPublisher.publishCopyReserved(loanId, copy.getId(), titleId);
+                        },
+                        () -> {
+                            log.info("No available copy for reservation: titleId={}, loanId={}", titleId, loanId);
+                            eventPublisher.publishCopyReservationFailed(loanId, titleId, "No available copies");
+                        }
+                );
+    }
+
+    @Transactional
+    public void releaseCopy(UUID loanId, UUID copyId) {
+        Copy copy = copyRepository.findById(copyId)
+                .orElseThrow(() -> new CopyNotFoundException(copyId));
+
+        copy.setStatus(CopyStatus.AVAILABLE);
+        copyRepository.saveAndFlush(copy);
+        log.info("Copy released: copyId={}, loanId={}", copyId, loanId);
+        eventPublisher.publishCopyReleased(loanId, copyId, copy.getTitleId());
     }
 
     // -------------------------------------------------------------------------
